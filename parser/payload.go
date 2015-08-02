@@ -9,20 +9,22 @@ import (
 	"strconv"
 )
 
-// payloadEncoder is the encoder to encode packets as payload.
+var ErrInvalidMessageType = errors.New("invalid message type")
+
+// PayloadEncoder is the encoder to encode packets as payload.
 type PayloadEncoder struct {
 	buffers [][]byte
 	isText  bool
 }
 
-// NewStringPayloadEncoder returns the encoder which encode as string.
+// NewTextPayloadEncoder returns the encoder which encode as string.
 func NewTextPayloadEncoder() *PayloadEncoder {
 	return &PayloadEncoder{
 		isText: true,
 	}
 }
 
-// NewStringPayloadEncoder returns the encoder which encode as binary.
+// NewBinaryPayloadEncoder returns the encoder which encode as binary.
 func NewBinaryPayloadEncoder() *PayloadEncoder {
 	return &PayloadEncoder{
 		isText: false,
@@ -91,8 +93,6 @@ func (e *PayloadEncoder) nextBinary(t PacketType) (io.WriteCloser, error) {
 	}, nil
 }
 
-var ErrInvalidMessageType = errors.New("invalid message type")
-
 // Next returns next writer.
 func (e *PayloadEncoder) Next(pkg PacketType, msg MessageType) (io.WriteCloser, error) {
 	switch msg {
@@ -115,17 +115,17 @@ func (e *PayloadEncoder) EncodeTo(w io.Writer) error {
 	return nil
 }
 
-//IsString returns true if payload encode to text, otherwise returns false.
+//IsText returns true if payload encode to text, otherwise returns false.
 func (e *PayloadEncoder) IsText() bool {
 	return e.isText
 }
 
-// payloadDecoder is the decoder to decode payload.
+// PayloadDecoder is the decoder to decode payload.
 type PayloadDecoder struct {
 	r *bufio.Reader
 }
 
-// NewPaylaodDecoder returns the payload decoder which read from reader r.
+// NewPayloadDecoder returns the payload decoder which read from reader r.
 func NewPayloadDecoder(r io.Reader) *PayloadDecoder {
 	br, ok := r.(*bufio.Reader)
 	if !ok {
