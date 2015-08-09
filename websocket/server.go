@@ -2,9 +2,9 @@ package websocket
 
 import (
 	"io"
+	"io/ioutil"
 	"net/http"
 
-	"github.com/googollee/go-engine.io/message"
 	"github.com/googollee/go-engine.io/parser"
 	"github.com/googollee/go-engine.io/transport"
 	"github.com/gorilla/websocket"
@@ -15,8 +15,8 @@ type Server struct {
 	conn     *websocket.Conn
 }
 
-func NewServer(w http.ResponseWriter, r *http.Request, callback transport.Callback) (transport.Server, error) {
-	conn, err := websocket.Upgrade(w, r, nil, 10240, 10240)
+func NewServer(upgrader *websocket.Upgrader, w http.ResponseWriter, r *http.Request, callback transport.Callback) (transport.Server, error) {
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -35,17 +35,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-func (s *Server) NextWriter(msgType message.MessageType, packetType parser.PacketType) (io.WriteCloser, error) {
-	wsType, newEncoder := websocket.TextMessage, parser.NewStringEncoder
-	if msgType == message.MessageBinary {
-		wsType, newEncoder = websocket.BinaryMessage, parser.NewBinaryEncoder
+func (s *Server) NextWriter(msg parser.MessageType, pkg parser.PacketType) (io.WriteCloser, error) {
+	wsType := websocket.TextMessage
+	if msg == parser.MessageBinary {
+		wsType = websocket.BinaryMessage
 	}
 
 	w, err := s.conn.NextWriter(wsType)
 	if err != nil {
 		return nil, err
 	}
-	ret, err := newEncoder(w, packetType)
+	ret, err := parser.NewEncoder(w, pkg, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		case websocket.TextMessage:
 			fallthrough
 		case websocket.BinaryMessage:
-			decoder, err := parser.NewDecoder(r)
+			decoder, err := parser.NewDecoder(ioutil.NopCloser(r))
 			if err != nil {
 				return
 			}
