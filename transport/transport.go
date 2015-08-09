@@ -4,7 +4,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/googollee/go-engine.io/message"
 	"github.com/googollee/go-engine.io/parser"
 )
 
@@ -14,10 +13,9 @@ type Callback interface {
 }
 
 type Creater struct {
-	Name      string
-	Upgrading bool
-	Server    func(w http.ResponseWriter, r *http.Request, callback Callback) (Server, error)
-	Client    func(r *http.Request) (Client, error)
+	Name   string
+	Server func(w http.ResponseWriter, r *http.Request, callback Callback) (Server, error)
+	Client func(r *http.Request) (Client, error)
 }
 
 // Server is a transport layer in server to connect client.
@@ -30,7 +28,7 @@ type Server interface {
 	Close() error
 
 	// NextWriter returns packet writer. This function call should be synced.
-	NextWriter(messageType message.MessageType, packetType parser.PacketType) (io.WriteCloser, error)
+	NextWriter(messageType parser.MessageType, packetType parser.PacketType) (io.WriteCloser, error)
 }
 
 // Client is a transport layer in client to connect server.
@@ -43,7 +41,7 @@ type Client interface {
 	NextReader() (*parser.PacketDecoder, error)
 
 	// NextWriter returns packet writer. This function call should be synced.
-	NextWriter(messageType message.MessageType, packetType parser.PacketType) (io.WriteCloser, error)
+	NextWriter(messageType parser.MessageType, packetType parser.PacketType) (io.WriteCloser, error)
 
 	// Close closes the transport.
 	Close() error
