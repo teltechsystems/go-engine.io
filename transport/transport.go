@@ -2,40 +2,21 @@ package transport
 
 import (
 	"io"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/googollee/go-engine.io/parser"
 )
 
-type Callback interface {
-	OnPacket(r *parser.PacketDecoder)
-	OnClose(server Server)
-}
-
 type Creater struct {
 	Name   string
-	Server func(w http.ResponseWriter, r *http.Request, callback Callback) (Server, error)
+	Server func(w http.ResponseWriter, r *http.Request) (Server, error)
 	Client func(r *http.Request) (Client, error)
 }
 
-// Server is a transport layer in server to connect client.
-type Server interface {
-
-	// ServeHTTP handles the http request. It will call conn.onPacket when receive packet.
-	ServeHTTP(http.ResponseWriter, *http.Request)
-
-	// Close closes the transport.
-	Close() error
-
-	// NextWriter returns packet writer. This function call should be synced.
-	NextWriter(messageType parser.MessageType, packetType parser.PacketType) (io.WriteCloser, error)
-}
-
-// Client is a transport layer in client to connect server.
-type Client interface {
-
-	// Response returns the response of last http request.
-	Response() *http.Response
+// Conn is a transport connection.
+type Conn interface {
 
 	// NextReader returns packet decoder. This function call should be synced.
 	NextReader() (*parser.PacketDecoder, error)
@@ -45,4 +26,24 @@ type Client interface {
 
 	// Close closes the transport.
 	Close() error
+
+	RemoteAddr() net.Addr
+	LocalAddr() net.Addr
+
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
+}
+
+// Server is a transport layer in server.
+type Server interface {
+	Conn
+	// ServeHTTP handles the http request. It will call conn.onPacket when receive packet.
+	ServeHTTP(http.ResponseWriter, *http.Request)
+}
+
+// Client is a transport layer in client to connect server.
+type Client interface {
+	Conn
+	// Response returns the response of last http request.
+	Response() *http.Response
 }

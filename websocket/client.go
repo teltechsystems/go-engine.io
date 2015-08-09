@@ -3,7 +3,9 @@ package websocket
 import (
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/googollee/go-engine.io/parser"
 	"github.com/googollee/go-engine.io/transport"
@@ -67,4 +69,20 @@ func (c *client) NextWriter(msg parser.MessageType, pkg parser.PacketType) (io.W
 
 func (c *client) Close() error {
 	return c.conn.Close()
+}
+
+func (c *client) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+func (c *client) LocalAddr() net.Addr {
+	return c.conn.LocalAddr()
+}
+
+func (c *client) SetReadDeadline(t time.Time) error {
+	return c.conn.SetReadDeadline(t)
+}
+
+func (c *client) SetWriteDeadline(t time.Time) error {
+	return c.conn.SetWriteDeadline(t)
 }

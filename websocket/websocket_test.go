@@ -5,52 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync"
 	"testing"
 
 	"github.com/googollee/go-assert"
-	"github.com/googollee/go-engine.io/transport"
 	"github.com/gorilla/websocket"
 
 	"github.com/googollee/go-engine.io/parser"
 )
-
-type fakeCallback struct {
-	onPacket    chan bool
-	messageType parser.MessageType
-	packetType  parser.PacketType
-	body        []byte
-	err         error
-	closedCount int
-	countLocker sync.Mutex
-	closeServer transport.Server
-}
-
-func newFakeCallback() *fakeCallback {
-	return &fakeCallback{
-		onPacket: make(chan bool),
-	}
-}
-
-func (f *fakeCallback) OnPacket(r *parser.PacketDecoder) {
-	f.packetType = r.PacketType()
-	f.messageType = r.MessageType()
-	f.body, f.err = ioutil.ReadAll(r)
-	f.onPacket <- true
-}
-
-func (f *fakeCallback) OnClose(s transport.Server) {
-	f.countLocker.Lock()
-	defer f.countLocker.Unlock()
-	f.closedCount++
-	f.closeServer = s
-}
-
-func (f *fakeCallback) ClosedCount() int {
-	f.countLocker.Lock()
-	defer f.countLocker.Unlock()
-	return f.closedCount
-}
 
 func TestWebsocket(t *testing.T) {
 	creater := NewCreater(&websocket.Upgrader{
@@ -59,8 +20,7 @@ func TestWebsocket(t *testing.T) {
 	})
 	sync := make(chan int)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		f := newFakeCallback()
-		s, err := creater.Server(w, r, f)
+		s, err := creater.Server(w, r)
 		assert.MustEqual(t, err, nil)
 		defer s.Close()
 
@@ -83,22 +43,30 @@ func TestWebsocket(t *testing.T) {
 		sync <- 1
 
 		{
-			<-f.onPacket
-			assert.MustEqual(t, f.err, nil)
-			assert.MustEqual(t, f.messageType, parser.MessageBinary)
-			assert.MustEqual(t, f.packetType, parser.PacketMessage)
-			assert.Equal(t, string(f.body), "测试Binary")
+			r, err := s.NextReader()
+			assert.MustEqual(t, err, nil)
+			assert.MustEqual(t, r.MessageType(), parser.MessageBinary)
+			assert.MustEqual(t, r.PacketType(), parser.PacketMessage)
+			b, err := ioutil.ReadAll(r)
+			assert.MustEqual(t, err, nil)
+			assert.Equal(t, string(b), "测试Binary")
+			err = r.Close()
+			assert.MustEqual(t, err, nil)
 		}
 
 		<-sync
 		sync <- 1
 
 		{
-			<-f.onPacket
-			assert.MustEqual(t, f.err, nil)
-			assert.MustEqual(t, f.messageType, parser.MessageText)
-			assert.MustEqual(t, f.packetType, parser.PacketMessage)
-			assert.Equal(t, string(f.body), "测试Text")
+			r, err := s.NextReader()
+			assert.MustEqual(t, err, nil)
+			assert.MustEqual(t, r.MessageType(), parser.MessageText)
+			assert.MustEqual(t, r.PacketType(), parser.PacketMessage)
+			b, err := ioutil.ReadAll(r)
+			assert.MustEqual(t, err, nil)
+			assert.Equal(t, string(b), "测试Text")
+			err = r.Close()
+			assert.MustEqual(t, err, nil)
 		}
 
 		<-sync
@@ -107,7 +75,8 @@ func TestWebsocket(t *testing.T) {
 		{
 			w, err := s.NextWriter(parser.MessageText, parser.PacketMessage)
 			assert.MustEqual(t, err, nil)
-			w.Write([]byte("日本語Text"))
+			_, err = w.Write([]byte("日本語Text"))
+			assert.MustEqual(t, err, nil)
 			err = w.Close()
 			assert.MustEqual(t, err, nil)
 		}
@@ -118,7 +87,8 @@ func TestWebsocket(t *testing.T) {
 		{
 			w, err := s.NextWriter(parser.MessageBinary, parser.PacketMessage)
 			assert.MustEqual(t, err, nil)
-			w.Write([]byte("日本語Binary"))
+			_, err = w.Write([]byte("日本語Binary"))
+			assert.MustEqual(t, err, nil)
 			err = w.Close()
 			assert.MustEqual(t, err, nil)
 		}
@@ -147,18 +117,24 @@ func TestWebsocket(t *testing.T) {
 	<-sync
 
 	{
-		w, _ := c.NextWriter(parser.MessageBinary, parser.PacketMessage)
-		w.Write([]byte("测试Binary"))
-		w.Close()
+		w, err := c.NextWriter(parser.MessageBinary, parser.PacketMessage)
+		assert.MustEqual(t, err, nil)
+		_, err = w.Write([]byte("测试Binary"))
+		assert.MustEqual(t, err, nil)
+		err = w.Close()
+		assert.MustEqual(t, err, nil)
 	}
 
 	sync <- 1
 	<-sync
 
 	{
-		w, _ := c.NextWriter(parser.MessageText, parser.PacketMessage)
-		w.Write([]byte("测试Text"))
-		w.Close()
+		w, err := c.NextWriter(parser.MessageText, parser.PacketMessage)
+		assert.MustEqual(t, err, nil)
+		_, err = w.Write([]byte("测试Text"))
+		assert.MustEqual(t, err, nil)
+		err = w.Close()
+		assert.MustEqual(t, err, nil)
 	}
 
 	sync <- 1
