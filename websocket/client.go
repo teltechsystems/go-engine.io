@@ -3,7 +3,6 @@ package websocket
 import (
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"time"
 
@@ -69,14 +68,6 @@ func (c *client) NextWriter(msg parser.MessageType, pkg parser.PacketType) (io.W
 
 func (c *client) Close() error {
 	return c.conn.Close()
-}
-
-func (c *client) RemoteAddr() net.Addr {
-	return c.conn.RemoteAddr()
-}
-
-func (c *client) LocalAddr() net.Addr {
-	return c.conn.LocalAddr()
 }
 
 func (c *client) SetReadDeadline(t time.Time) error {

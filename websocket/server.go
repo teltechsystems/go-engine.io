@@ -3,7 +3,6 @@ package websocket
 import (
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"time"
 
@@ -68,14 +67,6 @@ func (s Server) NextReader() (*parser.PacketDecoder, error) {
 
 func (s *Server) Close() error {
 	return s.conn.Close()
-}
-
-func (s *Server) RemoteAddr() net.Addr {
-	return s.conn.RemoteAddr()
-}
-
-func (s *Server) LocalAddr() net.Addr {
-	return s.conn.LocalAddr()
 }
 
 func (s *Server) SetReadDeadline(t time.Time) error {

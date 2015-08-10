@@ -9,8 +9,7 @@ import (
 
 func TestWriter(t *testing.T) {
 	p := &Polling{
-		state:    stateNormal,
-		sendChan: MakeSendChan(),
+		sendChan: makeSendChan(),
 	}
 	sendChan := p.sendChan
 
@@ -19,11 +18,11 @@ func TestWriter(t *testing.T) {
 
 		select {
 		case <-sendChan:
-			panic("should not run here")
+			t.Fatal("should not run here")
 		default:
 		}
 
-		writer := NewWriter(w, p)
+		writer := newWriter(w, p)
 		err := writer.Close()
 		So(err, ShouldBeNil)
 
@@ -43,7 +42,7 @@ func TestWriter(t *testing.T) {
 	Convey("Many writer with close", t, func() {
 		for i := 0; i < 10; i++ {
 			w := newFakeWriteCloser()
-			writer := NewWriter(w, p)
+			writer := newWriter(w, p)
 			err := writer.Close()
 			So(err, ShouldBeNil)
 		}
@@ -64,11 +63,11 @@ func TestWriter(t *testing.T) {
 	Convey("Close with not normal", t, func() {
 		p := &Polling{
 			state:    stateClosing,
-			sendChan: MakeSendChan(),
+			sendChan: makeSendChan(),
 		}
 
 		w := newFakeWriteCloser()
-		writer := NewWriter(w, p)
+		writer := newWriter(w, p)
 		err := writer.Close()
 		So(err, ShouldNotBeNil)
 	})

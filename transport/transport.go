@@ -2,7 +2,6 @@ package transport
 
 import (
 	"io"
-	"net"
 	"net/http"
 	"time"
 
@@ -26,9 +25,6 @@ type Conn interface {
 
 	// Close closes the transport.
 	Close() error
-
-	RemoteAddr() net.Addr
-	LocalAddr() net.Addr
 
 	SetReadDeadline(t time.Time) error
 	SetWriteDeadline(t time.Time) error

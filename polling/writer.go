@@ -1,30 +1,24 @@
 package polling
 
-import (
-	"errors"
-	"io"
-)
+import "io"
 
-func MakeSendChan() chan bool {
+func makeSendChan() chan bool {
 	return make(chan bool, 1)
 }
 
-type Writer struct {
+type writer struct {
 	io.WriteCloser
 	server *Polling
 }
 
-func NewWriter(w io.WriteCloser, server *Polling) *Writer {
-	return &Writer{
+func newWriter(w io.WriteCloser, server *Polling) *writer {
+	return &writer{
 		WriteCloser: w,
 		server:      server,
 	}
 }
 
-func (w *Writer) Close() error {
-	if w.server.getState() != stateNormal {
-		return errors.New("use of closed network connection")
-	}
+func (w *writer) Close() error {
 	select {
 	case w.server.sendChan <- true:
 	default:
