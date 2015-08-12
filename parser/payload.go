@@ -3,121 +3,117 @@ package parser
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
 )
 
-var ErrInvalidMessageType = errors.New("invalid message type")
-
-// PayloadEncoder is the encoder to encode packets as payload.
-type PayloadEncoder struct {
-	buffers [][]byte
-	isText  bool
+// Packet is information of one packet
+type Packet struct {
+	Code CodeType
+	Type PacketType
+	Data []byte
 }
 
-// NewTextPayloadEncoder returns the encoder which encode as string.
-func NewTextPayloadEncoder() *PayloadEncoder {
-	return &PayloadEncoder{
-		isText: true,
-	}
+type payloadEncoder interface {
+	Encode(Packet) error
 }
 
-// NewBinaryPayloadEncoder returns the encoder which encode as binary.
-func NewBinaryPayloadEncoder() *PayloadEncoder {
-	return &PayloadEncoder{
-		isText: false,
-	}
+// EncodeToBinaryPayload encodes packets to w, using binary code.
+func EncodeToBinaryPayload(w io.Writer, packets []Packet) error {
+	encoder := newBinaryPayloadEncoder(w)
+	return encodeToPayload(encoder, packets)
 }
 
-type encoder struct {
-	*PacketEncoder
-	buf          *buffer
-	binaryPrefix string
-	payload      *PayloadEncoder
+// EncodeToTextPayload encodes packets to w, using text code.
+func EncodeToTextPayload(w io.Writer, packets []Packet) error {
+	encoder := newTextPayloadEncoder(w)
+	return encodeToPayload(encoder, packets)
 }
 
-func (e encoder) Close() error {
-	if err := e.PacketEncoder.Close(); err != nil {
-		return err
-	}
-	var buffer []byte
-	if e.payload.isText {
-		buffer = []byte(fmt.Sprintf("%d:%s", e.buf.Len(), e.buf.String()))
-	} else {
-		buffer = []byte(fmt.Sprintf("%s%d", e.binaryPrefix, e.buf.Len()))
-		for i, n := 0, len(buffer); i < n; i++ {
-			buffer[i] = buffer[i] - '0'
-		}
-		buffer = append(buffer, 0xff)
-		buffer = append(buffer, e.buf.Bytes()...)
-	}
-
-	e.payload.buffers = append(e.payload.buffers, buffer)
-
-	return nil
-}
-
-func (e *PayloadEncoder) nextText(t PacketType) (io.WriteCloser, error) {
-	buf := newBuffer()
-	pEncoder, err := NewEncoder(buf, t, MessageText)
-	if err != nil {
-		return nil, err
-	}
-	return encoder{
-		PacketEncoder: pEncoder,
-		buf:           buf,
-		binaryPrefix:  "0",
-		payload:       e,
-	}, nil
-}
-
-func (e *PayloadEncoder) nextBinary(t PacketType) (io.WriteCloser, error) {
-	buf := newBuffer()
-	var pEncoder *PacketEncoder
-	var err error
-	if e.isText {
-		pEncoder, err = NewB64Encoder(buf, t)
-	} else {
-		pEncoder, err = NewEncoder(buf, t, MessageBinary)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return encoder{
-		PacketEncoder: pEncoder,
-		buf:           buf,
-		binaryPrefix:  "1",
-		payload:       e,
-	}, nil
-}
-
-// Next returns next writer.
-func (e *PayloadEncoder) Next(pkg PacketType, msg MessageType) (io.WriteCloser, error) {
-	switch msg {
-	case MessageBinary:
-		return e.nextBinary(pkg)
-	case MessageText:
-		return e.nextText(pkg)
-	}
-	return nil, ErrInvalidMessageType
-}
-
-// EncodeTo writes encoded payload to writer w. It will clear the buffer of encoder.
-func (e *PayloadEncoder) EncodeTo(w io.Writer) error {
-	for _, b := range e.buffers {
-		_, err := io.Copy(w, bytes.NewReader(b))
-		if err != nil {
+func encodeToPayload(encoder payloadEncoder, packets []Packet) error {
+	for i := range packets {
+		if err := encoder.Encode(packets[i]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-//IsText returns true if payload encode to text, otherwise returns false.
-func (e *PayloadEncoder) IsText() bool {
-	return e.isText
+type textPayloadEncoder struct {
+	w io.Writer
+}
+
+func newTextPayloadEncoder(w io.Writer) payloadEncoder {
+	return &textPayloadEncoder{
+		w: w,
+	}
+}
+
+func (e *textPayloadEncoder) Encode(p Packet) error {
+	length := normalEncodeLength
+	if p.Code == CodeBinary {
+		length = base64EncodeLength
+	}
+	prefix := fmt.Sprintf("%d:", length(len(p.Data)))
+	if _, err := io.WriteString(e.w, prefix); err != nil {
+		return err
+	}
+	var encoder io.Writer
+	var err error
+	if p.Code == CodeBinary {
+		encoder, err = NewB64Encoder(e.w, p.Type)
+	} else {
+		encoder, err = NewEncoder(e.w, p.Type, p.Code)
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := encoder.Write(p.Data); err != nil {
+		return err
+	}
+	if c, ok := encoder.(io.Closer); ok {
+		if err := c.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type binaryPayloadEncoder struct {
+	w io.Writer
+}
+
+func newBinaryPayloadEncoder(w io.Writer) payloadEncoder {
+	return &binaryPayloadEncoder{
+		w: w,
+	}
+}
+
+func (e *binaryPayloadEncoder) Encode(p Packet) error {
+	l := normalEncodeLength(len(p.Data))
+	prefix := "0"
+	if p.Code == CodeBinary {
+		prefix = "1"
+	}
+	header := []byte(fmt.Sprintf("%s%d", prefix, l))
+	for i, b := range header {
+		header[i] = b - '0'
+	}
+	if _, err := e.w.Write(header); err != nil {
+		return err
+	}
+	if _, err := e.w.Write([]byte{0xff}); err != nil {
+		return err
+	}
+	encoder, err := NewEncoder(e.w, p.Type, p.Code)
+	if err != nil {
+		return err
+	}
+	if _, err := encoder.Write(p.Data); err != nil {
+		return err
+	}
+	return nil
 }
 
 // PayloadDecoder is the decoder to decode payload.

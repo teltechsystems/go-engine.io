@@ -40,17 +40,17 @@ func TestParser(t *testing.T) {
 	type Test struct {
 		name   string
 		pkg    PacketType
-		msg    MessageType
+		msg    CodeType
 		data   []byte
 		output string
 		ok     bool
 	}
 
 	tests := []Test{
-		{"without data", PacketOpen, MessageText, nil, "0", true},
-		{"with data", PacketMessage, MessageText, []byte("测试"), "4\xe6\xb5\x8b\xe8\xaf\x95", true},
-		{"without data", PacketOpen, MessageBinary, nil, "\x00", true},
-		{"with data", PacketMessage, MessageBinary, []byte("测试"), "\x04\xe6\xb5\x8b\xe8\xaf\x95", true},
+		{"without data", PacketOpen, CodeText, nil, "0", true},
+		{"with data", PacketMessage, CodeText, []byte("测试"), "4\xe6\xb5\x8b\xe8\xaf\x95", true},
+		{"without data", PacketOpen, CodeBinary, nil, "\x00", true},
+		{"with data", PacketMessage, CodeBinary, []byte("测试"), "\x04\xe6\xb5\x8b\xe8\xaf\x95", true},
 	}
 	for _, test := range tests {
 		buf := newBuffer()
@@ -61,17 +61,12 @@ func TestParser(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		var _ io.WriteCloser = encoder
+		var _ io.Writer = encoder
 
 		// Encode
 		n, err := encoder.Write(test.data)
 		assert.MustEqual(t, err, nil, "test: %s", test.name)
 		assert.Equal(t, n, len(test.data), "test: %s", test.name)
-
-		// Close
-		err = encoder.Close()
-		assert.MustEqual(t, err, nil, "test: %s", test.name)
-		assert.Equal(t, buf.String(), test.output, "test: %s", test.name)
 
 		// Create decoder
 		decoder, err := NewDecoder(buf)
@@ -79,11 +74,11 @@ func TestParser(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		var _ io.ReadCloser = decoder
+		var _ io.Reader = decoder
 
 		// Decode
 		assert.MustEqual(t, decoder.PacketType(), test.pkg, "test: %s", test.name)
-		assert.MustEqual(t, decoder.MessageType(), test.msg, "test: %s", test.name)
+		assert.MustEqual(t, decoder.CodeType(), test.msg, "test: %s", test.name)
 		decoded := make([]byte, len(test.data)+1)
 		if len(test.data) > 0 {
 			n, err := decoder.Read(decoded)
@@ -94,10 +89,6 @@ func TestParser(t *testing.T) {
 		// EOF
 		_, err = decoder.Read(decoded[:])
 		assert.MustEqual(t, err, io.EOF, "test: %s", test.name)
-
-		// Close
-		err = decoder.Close()
-		assert.MustEqual(t, err, nil, "test: %s", test.name)
 	}
 }
 
@@ -124,7 +115,7 @@ func TestBase64Parser(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		var _ io.WriteCloser = encoder
+		var _ io.Writer = encoder
 
 		// Encode
 		n, err := encoder.Write(test.data)
@@ -134,7 +125,6 @@ func TestBase64Parser(t *testing.T) {
 		// Close
 		err = encoder.Close()
 		assert.MustEqual(t, err, nil, "test: %s", test.name)
-		assert.Equal(t, buf.String(), test.output, "test: %s", test.name)
 
 		// Create decoder
 		decoder, err := NewDecoder(buf)
@@ -142,20 +132,16 @@ func TestBase64Parser(t *testing.T) {
 		if err != nil {
 			continue
 		}
-		var _ io.ReadCloser = decoder
+		var _ io.Reader = decoder
 
 		// Decode
 		assert.MustEqual(t, decoder.PacketType(), test.pkg, "test: %s", test.name)
-		assert.MustEqual(t, decoder.MessageType(), MessageBinary, "test: %s", test.name)
+		assert.MustEqual(t, decoder.CodeType(), CodeBinary, "test: %s", test.name)
 		b, err := ioutil.ReadAll(decoder)
 		assert.MustEqual(t, err, nil, "test: %s", test.name)
 		assert.Equal(t, len(b), len(test.data), "test: %s", test.name)
 		if len(test.data) > 0 {
 			assert.Equal(t, b, test.data, "test: %s", test.name)
 		}
-
-		// Close
-		err = decoder.Close()
-		assert.MustEqual(t, err, nil, "test: %s", test.name)
 	}
 }
