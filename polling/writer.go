@@ -1,21 +1,29 @@
 package polling
 
-import "io"
+import (
+	"bytes"
 
-func makeSendChan() chan bool {
-	return make(chan bool, 1)
-}
+	"github.com/googollee/go-engine.io/parser"
+)
 
 type writer struct {
-	io.WriteCloser
 	server *Polling
+	code   parser.CodeType
+	typ    parser.PacketType
+	buf    *bytes.Buffer
 }
 
-func newWriter(w io.WriteCloser, server *Polling) *writer {
+func newWriter(server *Polling, code parser.CodeType, typ parser.PacketType) *writer {
 	return &writer{
-		WriteCloser: w,
-		server:      server,
+		server: server,
+		code:   code,
+		typ:    typ,
+		buf:    bytes.NewBuffer(nil),
 	}
+}
+
+func (w *writer) Write(p []byte) (int, error) {
+	return w.buf.Write(p)
 }
 
 func (w *writer) Close() error {
@@ -23,5 +31,14 @@ func (w *writer) Close() error {
 	case w.server.sendChan <- true:
 	default:
 	}
-	return w.WriteCloser.Close()
+	w.server.data = append(w.server.data, w.packet())
+	return nil
+}
+
+func (w *writer) packet() parser.Packet {
+	return parser.Packet{
+		Code: w.code,
+		Type: w.typ,
+		Data: w.buf.Bytes(),
+	}
 }

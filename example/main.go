@@ -37,7 +37,7 @@ func main() {
 						return
 					}
 					r.Close()
-					if t == engineio.MessageText {
+					if t == engineio.CodeText {
 						log.Println(t, string(b))
 					} else {
 						log.Println(t, hex.EncodeToString(b))

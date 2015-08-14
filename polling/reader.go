@@ -1,16 +1,16 @@
 package polling
 
-import "io"
+import "github.com/googollee/go-engine.io/parser"
 
 type reader struct {
-	io.ReadCloser
+	*parser.PacketDecoder
 	closed chan struct{}
 }
 
-func newReader(r io.ReadCloser) *reader {
+func newReader(d *parser.PacketDecoder) *reader {
 	return &reader{
-		ReadCloser: r,
-		closed:     make(chan struct{}),
+		PacketDecoder: d,
+		closed:        make(chan struct{}),
 	}
 }
 
@@ -18,7 +18,8 @@ func (r *reader) Close() error {
 	defer func() {
 		r.closed <- struct{}{}
 	}()
-	return r.ReadCloser.Close()
+
+	return nil
 }
 
 func (r *reader) wait() {

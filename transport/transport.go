@@ -10,24 +10,24 @@ import (
 
 type Creater struct {
 	Name   string
-	Server func(w http.ResponseWriter, r *http.Request) (Server, error)
-	Client func(r *http.Request) (Client, error)
+	Server func(http.ResponseWriter, *http.Request) (Server, error)
+	Client func(*http.Request) (Client, error)
 }
 
 // Conn is a transport connection.
 type Conn interface {
 
-	// NextReader returns packet decoder. This function call should be synced.
-	NextReader() (*parser.PacketDecoder, error)
+	// NextReader returns packet reader. This function call should be synced.
+	NextReader() (parser.CodeType, parser.PacketType, io.ReadCloser, error)
 
 	// NextWriter returns packet writer. This function call should be synced.
-	NextWriter(messageType parser.MessageType, packetType parser.PacketType) (io.WriteCloser, error)
+	NextWriter(parser.CodeType, parser.PacketType) (io.WriteCloser, error)
 
 	// Close closes the transport.
 	Close() error
 
-	SetReadDeadline(t time.Time) error
-	SetWriteDeadline(t time.Time) error
+	SetReadDeadline(time.Time) error
+	SetWriteDeadline(time.Time) error
 }
 
 // Server is a transport layer in server.

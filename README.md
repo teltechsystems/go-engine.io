@@ -53,7 +53,7 @@ func main() {
 					t, r, _ := conn.NextReader()
 					b, _ := ioutil.ReadAll(r)
 					r.Close()
-					if t == engineio.MessageText {
+					if t == engineio.CodeText {
 						log.Println(t, string(b))
 					} else {
 						log.Println(t, hex.EncodeToString(b))

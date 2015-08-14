@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/googollee/go-engine.io/message"
+	"github.com/googollee/go-engine.io/Code"
 	"github.com/googollee/go-engine.io/parser"
 	"github.com/googollee/go-engine.io/transport"
 )
 
-type MessageType message.MessageType
+type CodeType Code.CodeType
 
 const (
-	MessageBinary MessageType = MessageType(message.MessageBinary)
-	MessageText   MessageType = MessageType(message.MessageText)
+	CodeBinary CodeType = CodeType(Code.CodeBinary)
+	CodeText   CodeType = CodeType(Code.CodeText)
 )
 
 // Conn is the connection object of engine.io.
@@ -33,11 +33,11 @@ type Conn interface {
 	// Close closes the connection.
 	Close() error
 
-	// NextReader returns the next message type, reader. If no message received, it will block.
-	NextReader() (MessageType, io.ReadCloser, error)
+	// NextReader returns the next Code type, reader. If no Code received, it will block.
+	NextReader() (CodeType, io.ReadCloser, error)
 
-	// NextWriter returns the next message writer with given message type.
-	NextWriter(messageType MessageType) (io.WriteCloser, error)
+	// NextWriter returns the next Code writer with given Code type.
+	NextWriter(CodeType CodeType) (io.WriteCloser, error)
 }
 
 type transportCreaters map[string]transport.Creater
@@ -120,18 +120,18 @@ func (c *serverConn) Request() *http.Request {
 	return c.request
 }
 
-func (c *serverConn) NextReader() (MessageType, io.ReadCloser, error) {
+func (c *serverConn) NextReader() (CodeType, io.ReadCloser, error) {
 	if c.getState() == stateClosed {
-		return MessageBinary, nil, io.EOF
+		return CodeBinary, nil, io.EOF
 	}
 	ret := <-c.readerChan
 	if ret == nil {
-		return MessageBinary, nil, io.EOF
+		return CodeBinary, nil, io.EOF
 	}
-	return MessageType(ret.MessageType()), ret, nil
+	return CodeType(ret.CodeType()), ret, nil
 }
 
-func (c *serverConn) NextWriter(t MessageType) (io.WriteCloser, error) {
+func (c *serverConn) NextWriter(t CodeType) (io.WriteCloser, error) {
 	switch c.getState() {
 	case stateUpgrading:
 		for i := 0; i < 30; i++ {
@@ -147,7 +147,7 @@ func (c *serverConn) NextWriter(t MessageType) (io.WriteCloser, error) {
 	default:
 		return nil, io.EOF
 	}
-	ret, err := c.getCurrent().NextWriter(message.MessageType(t), parser.MESSAGE)
+	ret, err := c.getCurrent().NextWriter(Code.CodeType(t), parser.Code)
 	return ret, err
 }
 
@@ -159,7 +159,7 @@ func (c *serverConn) Close() error {
 		c.upgrading.Close()
 	}
 	c.writerLocker.Lock()
-	if w, err := c.getCurrent().NextWriter(message.MessageText, parser.CLOSE); err == nil {
+	if w, err := c.getCurrent().NextWriter(Code.CodeText, parser.CLOSE); err == nil {
 		writer := newConnWriter(w, &c.writerLocker)
 		writer.Close()
 	} else {
@@ -204,19 +204,19 @@ func (c *serverConn) OnPacket(r *parser.PacketDecoder) {
 		u := c.getUpgrade()
 		newWriter := t.NextWriter
 		if u != nil {
-			if w, _ := t.NextWriter(message.MessageText, parser.NOOP); w != nil {
+			if w, _ := t.NextWriter(Code.CodeText, parser.NOOP); w != nil {
 				w.Close()
 			}
 			newWriter = u.NextWriter
 		}
-		if w, _ := newWriter(message.MessageText, parser.PONG); w != nil {
+		if w, _ := newWriter(Code.CodeText, parser.PONG); w != nil {
 			io.Copy(w, r)
 			w.Close()
 		}
 		fallthrough
 	case parser.PONG:
 		c.pingChan <- true
-	case parser.MESSAGE:
+	case parser.Code:
 		closeChan := make(chan struct{})
 		c.readerChan <- newConnReader(r, closeChan)
 		<-closeChan
@@ -269,7 +269,7 @@ func (s *serverConn) onOpen() error {
 		PingInterval: s.callback.configure().PingInterval / time.Millisecond,
 		PingTimeout:  s.callback.configure().PingTimeout / time.Millisecond,
 	}
-	w, err := s.getCurrent().NextWriter(message.MessageText, parser.OPEN)
+	w, err := s.getCurrent().NextWriter(Code.CodeText, parser.OPEN)
 	if err != nil {
 		return err
 	}
@@ -357,7 +357,7 @@ func (c *serverConn) pingLoop() {
 			lastTry = lastPing
 		case <-time.After(c.pingInterval - tryDiff):
 			c.writerLocker.Lock()
-			if w, _ := c.getCurrent().NextWriter(message.MessageText, parser.PING); w != nil {
+			if w, _ := c.getCurrent().NextWriter(Code.CodeText, parser.PING); w != nil {
 				writer := newConnWriter(w, &c.writerLocker)
 				writer.Close()
 			} else {

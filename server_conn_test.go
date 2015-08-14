@@ -1,7 +1,7 @@
 package engineio
 
 import (
-	"github.com/googollee/go-engine.io/message"
+	"github.com/googollee/go-engine.io/Code"
 	"github.com/googollee/go-engine.io/parser"
 	"github.com/googollee/go-engine.io/polling"
 	"github.com/googollee/go-engine.io/websocket"
@@ -149,7 +149,7 @@ func TestConn(t *testing.T) {
 			So(conn, ShouldNotBeNil)
 			So(conn, ShouldImplement, (*Conn)(nil))
 
-			So(decoder.MessageType(), ShouldEqual, message.MessageText)
+			So(decoder.CodeType(), ShouldEqual, Code.CodeText)
 			So(decoder.Type(), ShouldEqual, parser.OPEN)
 
 			So(conn.getCurrent(), ShouldNotBeNil)
@@ -164,7 +164,7 @@ func TestConn(t *testing.T) {
 			So(conn.getCurrent(), ShouldNotBeNil)
 			So(conn.getUpgrade(), ShouldNotBeNil)
 
-			encoder, err := wc.NextWriter(message.MessageBinary, parser.PING)
+			encoder, err := wc.NextWriter(Code.CodeBinary, parser.PING)
 			So(err, ShouldBeNil)
 			encoder.Write([]byte("probe"))
 			encoder.Close()
@@ -173,12 +173,12 @@ func TestConn(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(wc.Response().StatusCode, ShouldEqual, http.StatusSwitchingProtocols)
 
-			So(decoder.MessageType(), ShouldEqual, message.MessageText)
+			So(decoder.CodeType(), ShouldEqual, Code.CodeText)
 			So(decoder.Type(), ShouldEqual, parser.PONG)
 
 			pc.Close()
 
-			encoder, err = wc.NextWriter(message.MessageBinary, parser.UPGRADE)
+			encoder, err = wc.NextWriter(Code.CodeBinary, parser.UPGRADE)
 			So(err, ShouldBeNil)
 			encoder.Close()
 
@@ -186,7 +186,7 @@ func TestConn(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(pc.Response().StatusCode, ShouldEqual, http.StatusOK)
 
-			So(decoder.MessageType(), ShouldEqual, message.MessageText)
+			So(decoder.CodeType(), ShouldEqual, Code.CodeText)
 			So(decoder.Type(), ShouldEqual, parser.PING)
 
 			So(conn.getCurrent(), ShouldNotBeNil)
@@ -246,7 +246,7 @@ func TestConn(t *testing.T) {
 			So(conn, ShouldNotBeNil)
 			So(conn, ShouldImplement, (*Conn)(nil))
 
-			So(decoder.MessageType(), ShouldEqual, message.MessageText)
+			So(decoder.CodeType(), ShouldEqual, Code.CodeText)
 			So(decoder.Type(), ShouldEqual, parser.OPEN)
 
 			So(conn.getCurrent(), ShouldNotBeNil)
@@ -261,7 +261,7 @@ func TestConn(t *testing.T) {
 			So(conn.getCurrent(), ShouldNotBeNil)
 			So(conn.getUpgrade(), ShouldNotBeNil)
 
-			encoder, err := wc.NextWriter(message.MessageBinary, parser.PING)
+			encoder, err := wc.NextWriter(Code.CodeBinary, parser.PING)
 			So(err, ShouldBeNil)
 			encoder.Write([]byte("probe"))
 			encoder.Close()
@@ -314,7 +314,7 @@ func TestConn(t *testing.T) {
 			decoder, err := pc.NextReader()
 			So(err, ShouldBeNil)
 
-			So(decoder.MessageType(), ShouldEqual, message.MessageText)
+			So(decoder.CodeType(), ShouldEqual, Code.CodeText)
 			So(decoder.Type(), ShouldEqual, parser.OPEN)
 
 			pc.Close()

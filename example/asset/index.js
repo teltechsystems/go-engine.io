@@ -401,9 +401,9 @@ Socket.prototype.onPacket = function (packet) {
         this.emit('error', err);
         break;
 
-      case 'message':
+      case 'Code':
         this.emit('data', packet.data);
-        this.emit('message', packet.data);
+        this.emit('Code', packet.data);
         break;
     }
   } else {
@@ -524,9 +524,9 @@ Socket.prototype.flush = function () {
 };
 
 /**
- * Sends a message.
+ * Sends a Code.
  *
- * @param {String} message.
+ * @param {String} Code.
  * @param {Function} callback function.
  * @return {Socket} for chaining.
  * @api public
@@ -534,7 +534,7 @@ Socket.prototype.flush = function () {
 
 Socket.prototype.write =
 Socket.prototype.send = function (msg, fn) {
-  this.sendPacket('message', msg, fn);
+  this.sendPacket('Code', msg, fn);
   return this;
 };
 
@@ -1444,7 +1444,7 @@ inherit(Polling, Transport);
 Polling.prototype.name = 'polling';
 
 /**
- * Opens the socket (triggers polling). We write a PING message to determine
+ * Opens the socket (triggers polling). We write a PING Code to determine
  * when the transport is open.
  *
  * @api private
@@ -1521,7 +1521,7 @@ Polling.prototype.onData = function(data){
   var self = this;
   debug('polling got data %s', data);
   var callback = function(packet, index, total) {
-    // if its the first message we consider the transport open
+    // if its the first Code we consider the transport open
     if ('opening' == self.readyState) {
       self.onOpen();
     }
@@ -1532,7 +1532,7 @@ Polling.prototype.onData = function(data){
       return false;
     }
 
-    // otherwise bypass onData and handle the message
+    // otherwise bypass onData and handle the Code
     self.onPacket(packet);
   };
 
@@ -1738,7 +1738,7 @@ WS.prototype.addEventListeners = function(){
   this.ws.onclose = function(){
     self.onClose();
   };
-  this.ws.onmessage = function(ev){
+  this.ws.onCode = function(ev){
     self.onData(ev.data);
   };
   this.ws.onerror = function(e){
@@ -2017,7 +2017,7 @@ debug.enabled = function(name) {
  */
 
 function coerce(val) {
-  if (val instanceof Error) return val.stack || val.message;
+  if (val instanceof Error) return val.stack || val.Code;
   return val;
 }
 
@@ -2226,7 +2226,7 @@ var packets = exports.packets = {
   , close:    1    // non-ws
   , ping:     2
   , pong:     3
-  , message:  4
+  , Code:  4
   , upgrade:  5
   , noop:     6
 };
@@ -2343,16 +2343,16 @@ function encodeBlob(packet, supportsBinary, callback) {
  * Encodes a packet with binary data in a base64 string
  *
  * @param {Object} packet, has `type` and `data`
- * @return {String} base64 encoded message
+ * @return {String} base64 encoded Code
  */
 
 exports.encodeBase64Packet = function(packet, callback) {
-  var message = 'b' + exports.packets[packet.type];
+  var Code = 'b' + exports.packets[packet.type];
   if (Blob && packet.data instanceof Blob) {
     var fr = new FileReader();
     fr.onload = function() {
       var b64 = fr.result.split(',')[1];
-      callback(message + b64);
+      callback(Code + b64);
     };
     return fr.readAsDataURL(packet.data);
   }
@@ -2369,8 +2369,8 @@ exports.encodeBase64Packet = function(packet, callback) {
     }
     b64data = String.fromCharCode.apply(null, basic);
   }
-  message += global.btoa(b64data);
-  return callback(message);
+  Code += global.btoa(b64data);
+  return callback(Code);
 };
 
 /**
@@ -2413,7 +2413,7 @@ exports.decodePacket = function (data, binaryType) {
 /**
  * Decodes a packet encoded in a base64 string
  *
- * @param {String} base64 encoded message
+ * @param {String} base64 encoded Code
  * @return {Object} with `type` and `data` (if any)
  */
 
@@ -2433,7 +2433,7 @@ exports.decodeBase64Packet = function(msg, binaryType) {
 };
 
 /**
- * Encodes multiple messages (payload).
+ * Encodes multiple Codes (payload).
  *
  *     <length>:data
  *
@@ -2466,13 +2466,13 @@ exports.encodePayload = function (packets, supportsBinary, callback) {
     return callback('0:');
   }
 
-  function setLengthHeader(message) {
-    return message.length + ':' + message;
+  function setLengthHeader(Code) {
+    return Code.length + ':' + Code;
   }
 
   function encodeOne(packet, doneCallback) {
-    exports.encodePacket(packet, supportsBinary, function(message) {
-      doneCallback(null, setLengthHeader(message));
+    exports.encodePacket(packet, supportsBinary, function(Code) {
+      doneCallback(null, setLengthHeader(Code));
     });
   }
 
@@ -2572,7 +2572,7 @@ exports.decodePayload = function (data, binaryType, callback) {
 };
 
 /**
- * Encodes multiple messages (payload) as binary.
+ * Encodes multiple Codes (payload) as binary.
  *
  * <1 = binary, 0 = string><number from 0-9><number from 0-9>[...]<number
  * 255><data>
@@ -4124,7 +4124,7 @@ socket.on('close', function(){
   if (smoothie) smoothie.stop();
   $('transport').innerHTML = '(disconnected)';
 });
-socket.on('message', function(msg){
+socket.on('Code', function(msg){
   console.log(msg);
   var latency = new Date - last;
   $('latency').innerHTML = latency + 'ms';
