@@ -17,28 +17,28 @@ import (
 
 var ErrTimeout = errors.New("timeout")
 
-type Polling struct {
+type server struct {
 	sendChan chan bool
 	readChan chan *reader
 	data     []parser.Packet
 
 	readDeadline  time.Time
-	readGuarder   int32
 	writeDeadline time.Time
-	writeGuarder  int32
+	getLocker     tryLocker
+	postLocker    tryLocker
 	isClosed      int32
 }
 
 func NewServer(w http.ResponseWriter, r *http.Request) (transport.Server, error) {
 
-	ret := &Polling{
+	ret := &server{
 		sendChan: make(chan bool, 1),
 		readChan: make(chan *reader),
 	}
 	return ret, nil
 }
 
-func (p *Polling) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (p *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if p.IsClosed() {
 		http.Error(w, "closed", http.StatusForbidden)
 		return
@@ -51,18 +51,18 @@ func (p *Polling) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *Polling) Close() error {
+func (p *server) Close() error {
 	atomic.StoreInt32(&p.isClosed, 1)
 	close(p.sendChan)
 	close(p.readChan)
 	return nil
 }
 
-func (p *Polling) IsClosed() bool {
+func (p *server) IsClosed() bool {
 	return atomic.LoadInt32(&p.isClosed) != 0
 }
 
-func (p *Polling) NextWriter(code parser.CodeType, typ parser.PacketType) (io.WriteCloser, error) {
+func (p *server) NextWriter(code parser.CodeType, typ parser.PacketType) (io.WriteCloser, error) {
 	if p.IsClosed() {
 		return nil, io.EOF
 	}
@@ -70,7 +70,7 @@ func (p *Polling) NextWriter(code parser.CodeType, typ parser.PacketType) (io.Wr
 	return newWriter(p, code, typ), nil
 }
 
-func (p *Polling) NextReader() (parser.CodeType, parser.PacketType, io.ReadCloser, error) {
+func (p *server) NextReader() (parser.CodeType, parser.PacketType, io.ReadCloser, error) {
 	if p.IsClosed() {
 		return 0, 0, nil, io.EOF
 	}
@@ -88,21 +88,21 @@ func (p *Polling) NextReader() (parser.CodeType, parser.PacketType, io.ReadClose
 	return 0, 0, nil, ErrTimeout
 }
 
-func (p *Polling) SetReadDeadline(t time.Time) error {
+func (p *server) SetReadDeadline(t time.Time) error {
 	p.readDeadline = t
 	return nil
 }
 
-func (p *Polling) SetWriteDeadline(t time.Time) error {
+func (p *server) SetWriteDeadline(t time.Time) error {
 	p.writeDeadline = t
 	return nil
 }
 
-func (p *Polling) get(w http.ResponseWriter, r *http.Request) {
-	if !atomic.CompareAndSwapInt32(&p.readGuarder, 0, 1) {
+func (p *server) get(w http.ResponseWriter, r *http.Request) {
+	if !p.getLocker.TryLock() {
 		http.Error(w, "interleave GET", http.StatusBadRequest)
 	}
-	defer atomic.StoreInt32(&p.readGuarder, 0)
+	defer p.getLocker.Unlock()
 
 	timeout := time.Duration(math.MaxInt64)
 	if !p.writeDeadline.IsZero() {
@@ -138,11 +138,11 @@ func (p *Polling) get(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *Polling) post(w http.ResponseWriter, r *http.Request) {
-	if !atomic.CompareAndSwapInt32(&p.writeGuarder, 0, 1) {
+func (p *server) post(w http.ResponseWriter, r *http.Request) {
+	if !p.postLocker.TryLock() {
 		http.Error(w, "interleave POST", http.StatusBadRequest)
 	}
-	defer atomic.StoreInt32(&p.writeGuarder, 0)
+	defer p.postLocker.Unlock()
 
 	var decoder *parser.PayloadDecoder
 	if j := r.URL.Query().Get("j"); j != "" {

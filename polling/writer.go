@@ -7,13 +7,13 @@ import (
 )
 
 type writer struct {
-	server *Polling
+	server *server
 	code   parser.CodeType
 	typ    parser.PacketType
 	buf    *bytes.Buffer
 }
 
-func newWriter(server *Polling, code parser.CodeType, typ parser.PacketType) *writer {
+func newWriter(server *server, code parser.CodeType, typ parser.PacketType) *writer {
 	return &writer{
 		server: server,
 		code:   code,
