@@ -1,37 +1,32 @@
 package polling
 
 import (
-	"io"
 	"strings"
 	"testing"
 
 	"github.com/googollee/go-assert"
+	"github.com/googollee/go-engine.io/parser"
 )
 
-type fakeReader struct {
-	io.Reader
-	closed bool
-}
-
-func (f *fakeReader) Close() error {
-	f.closed = true
-	return nil
-}
-
 func TestReader(t *testing.T) {
-	r := fakeReader{
-		Reader: strings.NewReader("abc"),
-	}
-	reader := newReader(r)
+	buf := strings.NewReader("4\xe6\xb5\x8b\xe8\xaf\x95")
+	decoder, err := parser.NewDecoder(buf)
+	assert.MustEqual(t, err, nil)
+
+	reader := newReader(decoder)
 
 	var b [10]byte
-	n, err := reader.Read()
+	n, err := reader.Read(b[:])
 	assert.MustEqual(t, err, nil)
-	assert.Equal(t, n, 3)
-	assert.Equal(t, b[:n], "abc")
+	assert.Equal(t, n, 6)
+	assert.Equal(t, string(b[:n]), "测试")
 
-	assert.MustEqual(t, r.closed, false)
-	go reader.Close()
-	reader.wait()
-	assert.MustEqual(t, r.closed, true)
+	sync := make(chan bool)
+	go func() {
+		err := reader.Close()
+		assert.MustEqual(t, err, nil)
+		sync <- true
+	}()
+	<-reader.wait()
+	<-sync
 }

@@ -15,13 +15,11 @@ func newReader(d *parser.PacketDecoder) *reader {
 }
 
 func (r *reader) Close() error {
-	defer func() {
-		r.closed <- struct{}{}
-	}()
+	r.closed <- struct{}{}
 
 	return nil
 }
 
-func (r *reader) wait() {
-	<-r.closed
+func (r *reader) wait() chan struct{} {
+	return r.closed
 }

@@ -3,11 +3,10 @@ package polling
 import (
 	"bytes"
 	"errors"
-	"html/template"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -27,10 +26,10 @@ type server struct {
 	getLocker     tryLocker
 	postLocker    tryLocker
 	isClosed      int32
+	waiter        sync.WaitGroup
 }
 
 func NewServer(w http.ResponseWriter, r *http.Request) (transport.Server, error) {
-
 	ret := &server{
 		sendChan: make(chan bool, 1),
 		readChan: make(chan *reader),
@@ -43,6 +42,9 @@ func (p *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "closed", http.StatusForbidden)
 		return
 	}
+	p.waiter.Add(1)
+	defer p.waiter.Done()
+
 	switch r.Method {
 	case "GET":
 		p.get(w, r)
@@ -52,7 +54,10 @@ func (p *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *server) Close() error {
-	atomic.StoreInt32(&p.isClosed, 1)
+	if !atomic.CompareAndSwapInt32(&p.isClosed, 0, 1) {
+		return nil
+	}
+	p.waiter.Wait()
 	close(p.sendChan)
 	close(p.readChan)
 	return nil
@@ -82,7 +87,7 @@ func (p *server) NextReader() (parser.CodeType, parser.PacketType, io.ReadCloser
 
 	select {
 	case d := <-p.readChan:
-		return d.CodeType(), d.PacketType(), ioutil.NopCloser(d), nil
+		return d.CodeType(), d.PacketType(), d, nil
 	case <-time.After(timeout):
 	}
 	return 0, 0, nil, ErrTimeout
@@ -128,9 +133,7 @@ func (p *server) get(w http.ResponseWriter, r *http.Request) {
 		// JSONP Polling
 		w.Header().Set("Content-Type", "text/javascript; charset=UTF-8")
 		w.Write([]byte("___eio[" + j + "](\""))
-		buf := bytes.NewBuffer(nil)
-		encode(buf, p.data)
-		template.JSEscape(w, buf.Bytes())
+		encode(newJSWriter(w), p.data)
 		w.Write([]byte("\");"))
 	} else {
 		// XHR Polling
@@ -147,12 +150,17 @@ func (p *server) post(w http.ResponseWriter, r *http.Request) {
 	var decoder *parser.PayloadDecoder
 	if j := r.URL.Query().Get("j"); j != "" {
 		// JSONP Polling
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		d := r.FormValue("d")
 		decoder = parser.NewPayloadDecoder(bytes.NewBufferString(d))
 	} else {
 		// XHR Polling
 		decoder = parser.NewPayloadDecoder(r.Body)
 	}
+	deadline := p.readDeadline
 	for {
 		d, err := decoder.Next()
 		if err == io.EOF {
@@ -164,8 +172,26 @@ func (p *server) post(w http.ResponseWriter, r *http.Request) {
 		}
 
 		r := newReader(d)
-		p.readChan <- r
-		r.wait()
+		timeout := time.Duration(math.MaxInt64)
+		if !deadline.IsZero() {
+			timeout = deadline.Sub(time.Now())
+		}
+		select {
+		case p.readChan <- r:
+		case <-time.After(timeout):
+			http.Error(w, "timeout", http.StatusRequestTimeout)
+			return
+		}
+		timeout = time.Duration(math.MaxInt64)
+		if !deadline.IsZero() {
+			timeout = deadline.Sub(time.Now())
+		}
+		select {
+		case <-r.wait():
+		case <-time.After(timeout):
+			http.Error(w, "timeout", http.StatusRequestTimeout)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/html")

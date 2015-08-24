@@ -2,9 +2,54 @@ package polling
 
 import (
 	"bytes"
+	"io"
+	"text/template"
 
 	"github.com/googollee/go-engine.io/parser"
 )
+
+type jsWriter struct {
+	errWriter
+}
+
+func newJSWriter(w io.Writer) *jsWriter {
+	return &jsWriter{
+		errWriter: errWriter{
+			w: w,
+		},
+	}
+}
+
+func (w *jsWriter) Write(p []byte) (int, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	template.JSEscape(&w.errWriter, p)
+	if w.err != nil {
+		return 0, w.err
+	}
+	return len(p), nil
+}
+
+func (w *jsWriter) Error() error {
+	return w.err
+}
+
+type errWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (w *errWriter) Write(p []byte) (int, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	n, err := w.w.Write(p)
+	if err != nil {
+		w.err = err
+	}
+	return n, err
+}
 
 type writer struct {
 	server *server
