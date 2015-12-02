@@ -5,8 +5,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/googollee/go-engine.io/message"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/teltechsystems/go-engine.io/message"
 )
 
 func TestPacketType(t *testing.T) {

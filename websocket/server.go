@@ -4,10 +4,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/googollee/go-engine.io/message"
-	"github.com/googollee/go-engine.io/parser"
-	"github.com/googollee/go-engine.io/transport"
 	"github.com/gorilla/websocket"
+	"github.com/teltechsystems/go-engine.io/message"
+	"github.com/teltechsystems/go-engine.io/parser"
+	"github.com/teltechsystems/go-engine.io/transport"
 )
 
 type Server struct {

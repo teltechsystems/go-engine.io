@@ -2,13 +2,13 @@ package engineio
 
 import (
 	"bytes"
-	"github.com/googollee/go-engine.io/parser"
 	"io"
 	"sync"
 	"testing"
 	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/teltechsystems/go-engine.io/parser"
 )
 
 func TestConnIoutil(t *testing.T) {

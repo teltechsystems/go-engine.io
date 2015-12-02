@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/googollee/go-engine.io/parser"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/teltechsystems/go-engine.io/parser"
 )
 
 func TestServer(t *testing.T) {

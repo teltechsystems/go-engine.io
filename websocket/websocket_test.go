@@ -2,8 +2,6 @@ package websocket
 
 import (
 	"encoding/hex"
-	"github.com/googollee/go-engine.io/transport"
-	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -11,9 +9,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/googollee/go-engine.io/message"
-	"github.com/googollee/go-engine.io/parser"
+	"github.com/gorilla/websocket"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/teltechsystems/go-engine.io/message"
+	"github.com/teltechsystems/go-engine.io/parser"
+	"github.com/teltechsystems/go-engine.io/transport"
 )
 
 func TestWebsocket(t *testing.T) {
