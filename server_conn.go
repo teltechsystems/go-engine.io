@@ -78,6 +78,7 @@ type serverConn struct {
 	pingTimeout     time.Duration
 	pingInterval    time.Duration
 	pingChan        chan bool
+	closed          bool
 }
 
 var InvalidError = errors.New("invalid transport")
@@ -237,15 +238,23 @@ func (c *serverConn) OnPacket(r *parser.PacketDecoder) {
 }
 
 func (c *serverConn) OnClose(server transport.Server) {
+	if c.closed {
+		return
+	}
+
 	if t := c.getUpgrade(); server == t {
 		c.setUpgrading("", nil)
 		t.Close()
 		return
 	}
+
 	t := c.getCurrent()
 	if server != t {
 		return
 	}
+
+	c.closed = true
+
 	t.Close()
 	if t := c.getUpgrade(); t != nil {
 		t.Close()
